@@ -1,0 +1,18 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: NIH 3T3 microtubule cell dataset
+message: >-
+  If you use this dataset, please cite it using the metadata
+  from this file.
+type: dataset
+authors:
+  - given-names: Ulrike
+    family-names: Rölleke
+    email: ulrike.roelleke@phys.uni-goettingen.de
+  - given-names: Sarah
+    family-names: Köster
+repository-code: 'https://github.com/leosuchan/Xist'
+abstract: >-
+  The data consists of 21 images of microtubules in PFA-fixed NIH 3T3 mouse embryonic fibroblasts (DSMZ: ACC59) labeled with a mouse anti-alpha-tubulin monoclonal IgG1 antibody (Thermofisher A11126, primary antibody) and visualized by a blue-fluorescent Alexa Fluor 405 goat anti-mouse IgG antibody (Thermofisher A-31553, secondary antibody). Acquisition of the images was performed using a confocal microscope (Olympus IX81). The images belong to Ulrike Rölleke and Sarah Köster (University of Göttingen).
