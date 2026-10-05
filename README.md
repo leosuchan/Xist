@@ -6,6 +6,7 @@ This repository contains five related sets of files:
    - `xist.py`
    - `xist_applications.py`
    - `bash_chaco.sh`
+   - `figures.ipynb`
 
 2. R code supplementary to the same paper:
    - `xist.R`
