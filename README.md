@@ -70,7 +70,7 @@ In particular, the Xist algorithm is implemented in `xist.py` for Python as well
 13. Done! You are now ready to run any part of `xist_application.py` and should therefore be able to reproduce the results from "Xist: Scalable graph cut clustering with statistical guarantees" (Li, Munk, Suchan, Kratz; 2023).
 
 
-## 2. Usage of the R code supplement to "A scalable algorithm to approximate graph cuts"
+## 2. Usage of the R code supplement to "Xist: Scalable graph cut clustering with statistical guarantees"
 
 1. Download `xist.R` and `xist_applications.R` from this repository.
 2. Run `xist.R`.
