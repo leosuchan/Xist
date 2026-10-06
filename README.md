@@ -36,7 +36,7 @@ In particular, the Xist algorithm is implemented in `xist.py` for Python as well
 4. Edit the path fragments `/home/kratz10/project_xist/Chaco/Chaco-2.2` inside the functions `ncut_chaco_unweighted` and `ncut_chaco` in `xist.py` to point towards your Chaco installation directory.
 5. If your Chaco installation directory is not `~/Chaco-2.2/`, change this expression in lines 5 and 6 of `bash_chaco.sh` so that it points towards your Chaco installation directory.
 6. Install xcut ( https://gitlab.com/vietaa/xcut) and follow the instructions to in their README. We used the preset "gcc- release"
-7. Edit the path fragment `/home/johanna/project/xcut/build/`  in "ncut_xcut" to point towards your xcut installations and the `/home/kratz10/project_xist/code/helpdata` to point towards your helpdata folder.
+7. Edit the path fragment `/home/kratz10/project_xist/xcut/build/`  in "ncut_xcut" to point towards your xcut installations and the `/home/kratz10/project_xist/code/helpdata` to point towards your helpdata folder.
 8. Download Scoreplus (https://cran.r-project.org/src/contrib/Archive/ScorePlus/). Put the file SCOREplus.R also into the same directory as `xist.py`. Install the necessary R packages (igraph, Rspectral)
 9. Install the following Python packages via pip:
    - `numpy`
