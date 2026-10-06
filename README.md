@@ -4,7 +4,7 @@ This repository contains five related sets of files:
 
 1. Python, R and C++ code supplementary to the paper "Xist: Scalable graph cut clustering with statistical guarantees" (Li, Munk, Suchan, Kratz; 2023), see [here on arXiv](https://arxiv.org/abs/2308.09613):
    - `xist.py`
-   - `xist_applications.py`
+   - `xist_application.py`
    - `bash_chaco.sh`
    - `figures.ipynb`
 
@@ -32,7 +32,7 @@ In particular, the Xist algorithm is implemented in `xist.py` for Python as well
 
 1. Install KaHIP for Python (https://github.com/KaHIP/KaHIP - follow the installation instructions in their README under section "Using KaHIP in Python", we used pip install kahip
 2. Install the Chaco algorithm (https://www3.cs.stonybrook.edu/~algorith/implement/chaco/implement.shtml)
-3. Download `xist.py`, `xist_applications.py`, `bash_chaco.sh`, `xist_dinic_faster.cpp` and `xvst.cpp` from this repository. Put them in a directory of your choosing and put `bash_chaco.sh` into the `exec` folder of your Chaco installation. Compile the C++ files.
+3. Download `xist.py`, `xist_application.py`, `bash_chaco.sh`, `xist_dinic_faster.cpp` and `xvst.cpp` from this repository. Put them in a directory of your choosing and put `bash_chaco.sh` into the `exec` folder of your Chaco installation. Compile the C++ files.
 4. Edit the path fragments `/home/kratz10/project_xist/Chaco/Chaco-2.2` inside the functions `ncut_chaco_unweighted` and `ncut_chaco` in `xist.py` to point towards your Chaco installation directory.
 5. If your Chaco installation directory is not `~/Chaco-2.2/`, change this expression in lines 5 and 6 of `bash_chaco.sh` so that it points towards your Chaco installation directory.
 6. Install xcut ( https://gitlab.com/vietaa/xcut) and follow the instructions to in their README. We used the preset "gcc- release"
@@ -50,6 +50,14 @@ In particular, the Xist algorithm is implemented in `xist.py` for Python as well
    - `rpy2`
    - `concurrent.futures`
    - `networkx`
+   - `collections.abc`
+   - `timeit`
+   - `math`
+   - `csv`
+   - `subprocess`
+   - `os.path` and `os`
+   - `scipy,sparse`
+   - `sys`
 10. Run `xist.py`.
 11. (Optional) If you desire to work with the NIH 3T3 Dataset, download the `NIH3T3_Data` folder from this repository and place it into your Python working directory.
 12. (Optional) If you desire to work with the large datasets used in the paper, download them from [the SNAP database](https://snap.stanford.edu/data/). Create a `Datasets` folder inside the `deploy` folder of your KaHIP installation, and put the following files into it:
@@ -59,7 +67,7 @@ In particular, the Xist algorithm is implemented in `xist.py` for Python as well
    - `Email-Enron.txt` (from https://snap.stanford.edu/data/email-Enron.html)
    - `artist_edges.csv` (from https://snap.stanford.edu/data/gemsec-Facebook.html)
    - `large_twitch_edges.csv` (from https://snap.stanford.edu/data/twitch_gamers.html)
-13. Done! You are now ready to run any part of `xist_applications.py` and should therefore be able to reproduce the results from "Xist: Scalable graph cut clustering with statistical guarantees" (Li, Munk, Suchan, Kratz; 2023).
+13. Done! You are now ready to run any part of `xist_application.py` and should therefore be able to reproduce the results from "Xist: Scalable graph cut clustering with statistical guarantees" (Li, Munk, Suchan, Kratz; 2023).
 
 
 ## 2. Usage of the R code supplement to "A scalable algorithm to approximate graph cuts"
