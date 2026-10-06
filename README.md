@@ -28,7 +28,7 @@ In particular, the Xist algorithm is implemented in `xist.py` for Python as well
 
 # Usage
 
-## 1. Installation of the Python code supplement to "A scalable algorithm to approximate graph cuts"
+## 1. Installation of the Python code supplement to "Xist: Scalable graph cut clustering with statistical guarantees" (including C++ implementation)
 
 1. Install KaHIP for Python (https://github.com/KaHIP/KaHIP - follow the installation instructions in their README under section "Using KaHIP in Python", we used pip install kahip
 2. Install the Chaco algorithm (https://www3.cs.stonybrook.edu/~algorith/implement/chaco/implement.shtml)
