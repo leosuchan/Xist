@@ -6,13 +6,23 @@ import math
 import csv
 import subprocess
 import os.path
+import scipy.sparse as sp
+import sys
+import os
 from PIL import Image
 import leidenalg
 import kahip
 import pymetis
 from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import SpectralClustering
-
+os.environ["R_LIBS_USER"] = ""
+os.environ["R_LIBS_SITE"] = ""
+from rpy2 import robjects
+from rpy2.robjects import numpy2ri, default_converter
+from rpy2.robjects.conversion import localconverter
+#from rpy2.rlike.container import NamedList, TaggedList
+from rpy2.robjects.vectors import ListVector
+from collections.abc import Mapping
 
 #### General helper methods:
 
@@ -49,7 +59,8 @@ def classification_rate(partition, T):
             cr_current = max(sum(S[i]==T[i] for i in range(len(S))), sum(S[i]==1-T[i] for i in range(len(S))))
             if cr_current > cr_best:
                 cr_best = cr_current
-        return cr_current / len(T)
+        #return cr_current / len(T)
+        return cr_best / len(T)
     else:
         return max(sum(partition[i]==T[i] for i in range(len(partition))), sum(partition[i]==1-T[i] for i in range(len(partition)))) / len(T)
 
@@ -76,6 +87,8 @@ def generate_tiff_edges(imgpath, m, t=1, sigm=math.nan, weights_by_sample=True):
     xm = int(ndim_img[0]/m)
     ym = int(ndim_img[1]/m)
     sample = np.array([[np.sum(img_arr[i*xm:(i+1)*xm,j*ym:(j+1)*ym]) for j in range(m)] for i in range(m)])
+    #if sample[-1,-1]==0:
+    #    print(sample)
     ndim = np.shape(sample)
     
     for x1 in range(ndim[0]):
@@ -125,6 +138,17 @@ def adjacency_for_kahip_unweighted(edgearray):
     xadj = np.cumsum([len(a) for a in adj])
     adjncy = [x for a in adj for x in a]
     return [list(np.concatenate(([0], xadj))), adjncy, edgearray.iloc[:,2]]
+
+def adjacency_for_scoreplus(df, num_nodes=None):
+    if num_nodes== None:
+        num_nodes = df[['id_1', 'id_2']].to_numpy().max() + 1  # number of nodes
+    adj = np.zeros((num_nodes, num_nodes))                    # initialize with zeros
+    for _, row in df.iterrows():
+        i, j = int(row['id_1']), int(row['id_2'])
+        adj[i, j] = 1
+        adj[j, i] = 1 # alternative: w, but we only use score on unweighted matrizes  
+    return adj
+
 
 #### Unweighted algorithms:
 
@@ -214,17 +238,17 @@ def ncut_metis_unweighted(edgearray):
 def ncut_chaco_unweighted(df, name, numit=1, print_chaco_output=True):
     chaco_best_ncut_value = math.inf
     adj_m = [[x+1 for x in a] for a in adjacency_for_metis(df)]
-    with open("/home/lsuchan/Chaco-2.2/exec/{0}_chaco.graph".format(name), "w") as f:
+    with open("/home/path/Chaco/Chaco-2.2/exec/{0}_chaco.graph".format(name), "w") as f:
         f.write("%s\t%s\n" %(max(map(max,adj_m)), int(sum([len(a) for a in adj_m])/2)))
         wr = csv.writer(f, delimiter="\t")
         wr.writerows(adj_m)
     if(print_chaco_output):
-        call(["/home/lsuchan/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)])
+        call(["/home/path/Chaco/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)])
     else:
-        check_output(["/home/lsuchan/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)])
+        check_output(["/home/path/Chaco/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)])
     df_graph = ig.Graph(edges=df.values.tolist()).simplify()
     for k in range(numit):
-        chaco_p1 = open("/home/lsuchan/Chaco-2.2/exec/ChacoOutput/cout{0}.txt".format(k), "r").read().split('\n')
+        chaco_p1 = open("/home/path/Chaco/Chaco-2.2/exec/ChacoOutput/cout{0}.txt".format(k), "r").read().split('\n')
         chaco_p = [int(i) for i in chaco_p1[:-1]]
         chaco_ncut_p = ncut_value(df_graph, chaco_p)
         if chaco_ncut_p < chaco_best_ncut_value:
@@ -232,6 +256,53 @@ def ncut_chaco_unweighted(df, name, numit=1, print_chaco_output=True):
             chaco_best_ncut_value = chaco_ncut_p
             chaco_best_ncut = chaco_p
     return [chaco_best_ncut_value, chaco_imbalance, chaco_best_ncut]
+
+
+
+# ScorePlus is designed for unweighted graphs, so we just use it here
+
+# Load your R script
+robjects.r['source']('SCOREplus.R')
+
+# Get the R function
+SCOREplus = robjects.globalenv['SCOREplus']
+
+def ncut_scoreplus(df):
+    df.columns = ['id_1', 'id_2', 'weight']
+    adj= adjacency_for_scoreplus(df)
+    #st= timer()
+    with localconverter(default_converter + numpy2ri.converter):
+        st= timer()
+        result = SCOREplus(adj, 2) #k=2
+        et= timer()
+    #et= timer()
+    # Handle both NamedList and TaggedList returns
+    #if isinstance(result, (NamedList, TaggedList)):
+    #    py_result = dict(zip(result.names(), list(result)))
+        # Convert numeric components to NumPy arrays
+    #    labels = np.array(py_result['labels'])
+    #else:
+    #    print("Unexpected result type:", type(result))
+    #if isinstance(result, ListVector):
+    #    py_result = dict(zip(result.names, list(result)))
+    #    labels = np.array(py_result['labels'])
+    #else:
+    #    print("Unexpected result type:", type(result))
+    #    raise TypeError(type(result))
+    if isinstance(result, Mapping):
+        labels = np.array(result['labels'])
+    else:
+        py_result = dict(zip(result.names, list(result)))
+        labels = np.array(py_result['labels'])
+    adj_cut= labels-1 # get a list of 0 and 1s instead of 1 and 2s. 
+    adj_mcut_value = sum(e['weight'] for _, e in df.iterrows() if (adj_cut[int(e['id_1'])] and not adj_cut[int(e['id_2'])])
+                         or (adj_cut[int(e['id_2'])] and not adj_cut[int(e['id_1'])]))
+    adj_inc_S = sum(df['weight'][i] for i in range(len(df)) if adj_cut[int(df['id_1'][i])])
+    adj_out_S = sum(df['weight'][i] for i in range(len(df)) if adj_cut[int(df['id_2'][i])])
+    adj_inc_S_C = sum(df['weight']) - adj_inc_S
+    adj_out_S_C = sum(df['weight']) - adj_out_S
+    return adj_mcut_value / ((adj_inc_S + adj_out_S) * (adj_inc_S_C + adj_out_S_C)),et-st, adj_cut
+
 
 
 ###### FUNCTIONS FOR WEIGHTED GRAPHS
@@ -254,6 +325,7 @@ def adjacency_for_kahip(edgearray, toint=False):
         eweights_normalizer = 2147483647 / sum(eweights)
         eweights = [round(w * eweights_normalizer) for a in eadj for w in a]
     return list(np.concatenate(([0], xadj))), adjncy, eweights
+
 
 #### Weighted algorithms:
 
@@ -297,7 +369,8 @@ def xist(df):
     tau_lst = [0] * len(locmax)
     for i in range(1,len(locmax)):
         stmc = df_graph.mincut(source=locmax[i], target=locmax[tau_lst[i]], capacity='weight')
-        if i in stmc.partition[0]:
+        if locmax[i] in stmc.partition[0]:
+        #if i in stmc.partition[0]:
             part_i = stmc.partition[0]
         else:
             part_i = stmc.partition[1]
@@ -313,6 +386,9 @@ def xist(df):
                 tau_lst[j] = i
     et = timer()
     return [df_ncut_value, et - st, df_ncut]
+
+
+
 
 def leidenoracle(df, exponential_resolution_scaling=False, classif_truth=None):
     best_ncut_value, best_part_n, best_eps_n, best_time_n = math.inf, [], math.nan, math.nan
@@ -387,17 +463,17 @@ def ncut_chaco(df, name, numit=1, print_chaco_output=True):
     chaco_imbalance = math.nan
     chaco_best_ncut = []
     adj_m = adjacency_for_metis(df, start_at=1)
-    with open("/home/lsuchan/Chaco-2.2/exec/{0}_chaco.graph".format(name), "w") as f:
+    with open("/home/path/Chaco/Chaco-2.2/exec/{0}_chaco.graph".format(name), "w") as f:
         f.write("%s\t%s\t001\n" %(max(map(max,adj_m)), int(sum([len(a) for a in adj_m])/4)))
         wr = csv.writer(f, delimiter="\t")
         wr.writerows(adj_m)
     if(print_chaco_output):
-        subprocess.call(["/home/lsuchan/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)])
+        subprocess.call(["/home/path/Chaco/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)])
         exit_status = 0
     else:
         try:
             st = timer()
-            subprocess.check_output(["/home/lsuchan/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)], timeout=30)
+            subprocess.check_output(["/home/path/Chaco/Chaco-2.2/exec/bash_chaco.sh", "{0}_chaco.graph".format(name), str(numit)], timeout=30)
             et = timer()
             exit_status = 0
         except subprocess.CalledProcessError as e:
@@ -409,8 +485,8 @@ def ncut_chaco(df, name, numit=1, print_chaco_output=True):
     if not exit_status:
         df_graph = ig.Graph(edges=df.iloc[:,0:2].values.tolist(), edge_attrs = {'weight': df.iloc[:,2]}).simplify(combine_edges={'weight': max})
         for k in range(numit):
-            if os.path.isfile("/home/lsuchan/Chaco-2.2/exec/ChacoOutput/cout{0}.txt".format(k)):
-                chaco_p1 = open("/home/lsuchan/Chaco-2.2/exec/ChacoOutput/cout{0}.txt".format(k), "r").read().split('\n')
+            if os.path.isfile("/home/path/Chaco/Chaco-2.2/exec/ChacoOutput/cout{0}.txt".format(k)):
+                chaco_p1 = open("/home/path/Chaco/Chaco-2.2/exec/ChacoOutput/cout{0}.txt".format(k), "r").read().split('\n')
                 chaco_p = [int(i) for i in chaco_p1[:-1]]
                 chaco_ncut_p = ncut_value(df_graph, chaco_p)
                 if chaco_ncut_p < chaco_best_ncut_value:
@@ -420,6 +496,7 @@ def ncut_chaco(df, name, numit=1, print_chaco_output=True):
     return [chaco_best_ncut_value, chaco_imbalance, chaco_best_ncut, et - st]
 
 def spectral_clustering(df, delta=0.2):
+    df.columns = ['id_1', 'id_2', 'weight']
     maxind = int(np.max(df.iloc[:,-2]))
     df_simmat = np.zeros((maxind+1, maxind+1))
     for _, e in df.iterrows():
@@ -436,3 +513,133 @@ def spectral_clustering(df, delta=0.2):
     adj_out_S_C = sum(df['weight']) - adj_out_S
 
     return adj_mcut_value / ((adj_inc_S + adj_out_S) * (adj_inc_S_C + adj_out_S_C)), et - st, clust
+
+def spectral_clustering_sparse(df, delta=0.2):
+    df.columns = ['id_1', 'id_2', 'weight']
+    maxind = int(np.max(df.iloc[:,-2]))
+    df_simmat = np.zeros((maxind+1, maxind+1))
+    for _, e in df.iterrows():
+        df_simmat[int(e['id_1']),int(e['id_2'])] = df_simmat[int(e['id_2']),int(e['id_1'])] = np.exp(-e['weight']**2 / (2*delta**2))
+        # This is the suggested method of computing the similarity matrix from the sklearn documentation.
+    st = timer()
+    clust = SpectralClustering(n_clusters=2, affinity='precomputed', random_state=8472).fit(df_simmat).labels_
+    et = timer()
+    adj_mcut_value = sum(e['weight'] for _, e in df.iterrows() if (clust[int(e['id_1'])] and not clust[int(e['id_2'])])
+                         or (clust[int(e['id_2'])] and not clust[int(e['id_1'])]))
+    adj_inc_S = sum(df['weight'][i] for i in range(len(df)) if clust[int(df['id_1'][i])])
+    adj_out_S = sum(df['weight'][i] for i in range(len(df)) if clust[int(df['id_2'][i])])
+    adj_inc_S_C = sum(df['weight']) - adj_inc_S
+    adj_out_S_C = sum(df['weight']) - adj_out_S
+
+    return adj_mcut_value / ((adj_inc_S + adj_out_S) * (adj_inc_S_C + adj_out_S_C)), et - st, clust
+
+
+
+def ncut_xcut(df, name, print_xcut_output=True, weighted= True):
+    df.columns = ['id_1', 'id_2', 'weight']
+    df_ori= df.copy()
+    if weighted and not all(isinstance(x, int) for x in df.iloc[:, 2]): 
+        weights_normalizer = 2147483647 /(df.iloc[:, 2].sum()+1)
+        df.iloc[:, 2] = (df.iloc[:, 2] * weights_normalizer).astype(int)+1
+    #df = df[df.iloc[:, 2] != 0]
+    df.iloc[:, 0] = df.iloc[:, 0] + 1
+    df.iloc[:, 1] = df.iloc[:, 1] + 1
+    df.to_csv(f"/home/path/code/helpdata/{name}.edges",
+              sep="\t", header=False, index=False)
+    if(print_xcut_output):
+        st= timer()
+        subprocess.call(["/home/path/xcut/build/app/xcut", "/home/path/code/helpdata/{0}.edges".format(name), "2"], cwd="/home/path/code/helpdata")
+        et= timer()
+    else:
+        st= timer()
+        subprocess.check_output(["/home/path/xcut/build/app/xcut", "/home/path/code/helpdata/{0}.edges".format(name), "2"], cwd="/home/path/code/helpdata")
+        et = timer()
+    adj_cut = np.loadtxt(f"/home/path/code/helpdata/{name}.part2",
+                delimiter="\t")
+    df.iloc[:, 0] = df.iloc[:, 0] - 1
+    df.iloc[:, 1] = df.iloc[:, 1] - 1
+    adj_mcut_value = sum(e['weight'] for _, e in df_ori.iterrows() if (adj_cut[int(e['id_1'])] and not adj_cut[int(e['id_2'])])
+                         or (adj_cut[int(e['id_2'])] and not adj_cut[int(e['id_1'])]))
+    adj_inc_S = sum(df_ori['weight'][i] for i in range(len(df)) if adj_cut[int(df_ori['id_1'][i])])
+    adj_out_S = sum(df_ori['weight'][i] for i in range(len(df)) if adj_cut[int(df_ori['id_2'][i])])
+    adj_inc_S_C = sum(df_ori['weight']) - adj_inc_S
+    adj_out_S_C = sum(df_ori['weight']) - adj_out_S
+    return adj_mcut_value / ((adj_inc_S + adj_out_S) * (adj_inc_S_C + adj_out_S_C)),et-st, adj_cut
+
+
+# wrapper for C++ implemention of xist and xvst
+
+import xist_dinic_faster
+import xvst_dinic_faster
+
+
+
+def _prepare_edges_for_cpp(df):
+    """Return list of (u,v,w) with integer weights suitable for C++ capacity fields.
+    Scales small/float weights to reasonable integer range to avoid DP algorithm hangs.
+    """
+    # Extract columns efficiently
+    ucol = df.iloc[:, 0].values
+    vcol = df.iloc[:, 1].values
+    wcol = df.iloc[:, 2].values.astype(float)
+
+    # Check if weights are already small integers
+    min_w = wcol.min()
+    max_w = wcol.max()
+    
+    #if min_w >= 1 and max_w < 100000:
+    if np.all(wcol % 1 == 0):
+        # Already reasonable, use as-is
+        int_weights = wcol.astype(np.int64)
+    else:
+        eweights_normalizer = 2147483647 / wcol.sum()
+
+        int_weights = np.round(wcol * eweights_normalizer).astype(np.int64)
+        # alternative add int_weights = np.maximum(int_weights, 1)
+
+    edges = [(int(u), int(v), int(w)) for u, v, w in zip(ucol, vcol, int_weights)]
+    return edges
+    
+
+def xist_dinic_faster_wrapper(df):
+    """Call C++ xist_dinic_faster and compute ncut in Python with timing."""
+    edges = _prepare_edges_for_cpp(df)
+    df.columns = ['id_1', 'id_2', 'weight'] # this is new
+    edges_objects = [xist_dinic_faster.EdgeInput(u, v, w) for u, v, w in edges]
+    n = int(max(max(u, v) for u, v in [[e[0], e[1]] for e in edges]) + 1) if edges else 0
+    st= timer()
+    cpp_result = xist_dinic_faster.xist(n, edges_objects)
+    et= timer()
+    #ncut_value = cpp_result[0]
+    elapsed= et-st  
+    partition = cpp_result[1]
+    if not partition:
+        return [np.inf, elapsed, partition]
+    adj_cut = np.zeros(n, dtype=bool)
+    adj_cut[partition[0]] = True
+    adj_mcut_value = sum(e['weight'] for _, e in df.iterrows() if (adj_cut[int(e['id_1'])] and not adj_cut[int(e['id_2'])])
+                         or (adj_cut[int(e['id_2'])] and not adj_cut[int(e['id_1'])]))
+    adj_inc_S = sum(df['weight'][i] for i in range(len(df)) if adj_cut[int(df['id_1'][i])])
+    adj_out_S = sum(df['weight'][i] for i in range(len(df)) if adj_cut[int(df['id_2'][i])])
+    adj_inc_S_C = sum(df['weight']) - adj_inc_S
+    adj_out_S_C = sum(df['weight']) - adj_out_S
+    ncut_value = adj_mcut_value / ((adj_inc_S + adj_out_S) * (adj_inc_S_C + adj_out_S_C))
+    return [ncut_value, elapsed, partition]
+
+def xvst_dinic_faster_wrapper(df):
+    """Call the C++ xvst implementation and return [ncut_value, elapsed, partition]."""
+    edges = _prepare_edges_for_cpp(df)
+    edges_objects = [xvst_dinic_faster.EdgeInput(u, v, w) for u, v, w in edges]
+    n = int(max(max(u, v) for u, v, _ in edges) + 1) if edges else 0
+
+    st = timer()
+    cpp_result = xvst_dinic_faster.xvst(n, edges_objects)
+    et = timer()
+
+    ncut_value = float(cpp_result[0])
+    elapsed = et - st
+    partition = cpp_result[1]
+
+    return [ncut_value, elapsed, partition]
+
+
